@@ -1,0 +1,75 @@
+component plant
+%Plant of quadrocopter
+
+inputs
+   ctrl={[0;0;0;0],'N'}; %Thrust:left
+end
+
+outputs
+    pos={[0;0;0],'m'}; %Position:right
+    v = {[0;0;0], 'm/s' }; %Velocity:right
+    a = {[0;0;0], 'm/s^2' }; %Acceleration:right
+    
+    angle = {[0;0;0],'rad'};%Angle:right
+    w = {[0;0;0],'rad/s'};%Angular velocity:right
+end
+
+parameters
+    m = {0.027,'kg'};%Mass
+    g = {9.81,'m/s^2'};%Gravity
+    d = {0.046,'m'};%Arm length
+    lift = {1.9796e-9,'N/(rad/s)^2'};%Lift constant
+    drag = {2.5383e-11,'N*m/(rad/s)^2'};%Drag constant
+end
+
+parameters(Access=private)    
+    %Moment of inertia matrix
+    Jx = {1.1463e-5,'kg*m^2'};
+    Jy = {1.6993e-5,'kg*m^2'};
+    Jz = {2.9944e-5,'kg*m^2'};
+    J = [Jx,0,0;0,Jy,0;0,0,Jz];
+
+    % Add time invariant parameters here 
+
+end
+
+variables(Access=private)
+end
+intermediates 
+    
+    %wRb = [sin(angle(2)); -cos(angle(2))*sin(angle(1));cos(angle(2))*cos(angle(1))];
+    
+    %Rotor angular speed, 
+    w_speed =  sqrt(abs(ctrl)/lift);
+    %Torque,
+    Tx = d*cos(pi/4) * (ctrl(3) + ctrl(4) - ctrl(1) - ctrl(2));
+    Ty = d*cos(pi/4) * (ctrl(2) + ctrl(3) - ctrl(1) - ctrl(4));
+    Tz = drag * (-w_speed(1).^2-w_speed(3).^2+w_speed(2).^2+w_speed(4).^2);
+    T=[Tx;Ty;Tz];
+end
+equations
+
+    % Add all equations here
+    let
+    %Rotation matrix,Body to World co-ordinate frame,
+    Rz = [cos(angle(3)), -sin(angle(3)), 0; sin(angle(3)), cos(angle(3)), 0; 0, 0, 1];
+    Ry = [cos(angle(2)), 0, sin(angle(2)); 0, 1, 0; -sin(angle(2)), 0, cos(angle(2))];
+    Rx = [1, 0, 0; 0, cos(angle(1)), -sin(angle(1)); 0, sin(angle(1)), cos(angle(1))];
+    wRb = Rx*Ry*Rz; 
+
+    in
+    %Dynamics in world co-ordinate system, To find the outputs,
+    a == 0;%[0;0;-m*g] + wRb * [0;0;sum(ctrl)];
+    
+    %a == 0;
+    %Velocity,
+    v.der==a;
+    pos.der==v;
+    
+    %Angular velocity,    
+    J * w.der == cross(-w,J*w) + T ;
+    angle.der==w;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    end
+end
+end
